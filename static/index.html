@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>galley</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="tb-left">
+    <button id="toggle-toc" title="Show or hide contents">&#9776;</button>
+    <span id="doc-title">Loading…</span>
+    <span id="git-status" class="muted"></span>
+  </div>
+  <div class="tb-right">
+    <label class="muted small">Agent
+      <select id="agent-select"></select>
+    </label>
+    <label id="effort-wrap" class="muted small" hidden>Thinking
+      <select id="effort-select"></select>
+    </label>
+    <button id="btn-document" title="Discuss the whole document with the agent">Discuss document <span id="doc-badge" class="mini-badge" hidden></span></button>
+    <button id="btn-proofs" title="Collapse or expand every proof">Hide proofs</button>
+    <button id="btn-wrapup" title="Summarize this session's record in the background">Wrap up</button>
+    <div class="menu-wrap">
+      <button id="btn-more" title="More">More &#9662;</button>
+      <div id="menu" hidden>
+        <button data-m="records">Session records and notes…</button>
+        <button data-m="instructions">Instructions for agents…</button>
+        <hr>
+        <button data-m="marking" id="m-marking">Mark agent-written text in violet</button>
+        <button data-m="violet" id="m-violet">Show violet text</button>
+        <button data-m="clear-all">Clear all violet marking…</button>
+        <hr>
+        <button data-m="annotated" id="m-annotated">Highlight passages with notes</button>
+        <button data-m="reload">Reload from source</button>
+        <button data-m="build">Build PDF</button>
+        <button data-m="pdf">Open PDF</button>
+        <hr>
+        <button data-m="about">About galley</button>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="watch-banner" hidden>The source changed on disk while you were editing. <button id="watch-reload">Discard my edit and reload</button></div>
+<div id="layout">
+  <nav id="toc"></nav>
+  <main id="doc"><p class="muted">Loading the document…</p></main>
+  <aside id="panel" hidden>
+    <div class="panel-head">
+      <div id="panel-title"></div>
+      <div class="panel-head-actions">
+        <button id="panel-locate" title="Scroll the document to this passage">Show in text <kbd class="key-hint" id="locate-key"></kbd></button>
+        <button id="panel-close" title="Close (Esc)">&times;</button>
+      </div>
+    </div>
+    <div id="panel-anchor" class="muted small"></div>
+    <div id="panel-source" class="no-math">
+      <details><summary>LaTeX source</summary><pre></pre></details>
+      <div class="source-actions"><button id="edit-source" class="small-btn">Edit source</button>
+        <button id="clear-marking" class="small-btn" hidden title="Remove the \AGTADD wrappers in this passage; the text stays">Clear violet marking here</button></div>
+    </div>
+    <div id="panel-edit" hidden>
+      <textarea id="edit-text" spellcheck="false"></textarea>
+      <div class="compose-actions"><button id="edit-save" class="primary">Save to file</button><button id="edit-cancel">Cancel</button>
+        <span class="muted small">Cmd/Ctrl-S saves. Your edit is not marked as agent-written.</span></div>
+    </div>
+    <div id="panel-selection" hidden></div>
+    <div id="panel-history"></div>
+    <div id="panel-thread"></div>
+    <div id="panel-compose">
+      <textarea id="compose-text" rows="4" placeholder="Ask about this passage, or describe the edit you want…"></textarea>
+      <div class="compose-actions">
+        <button id="send-explain" class="primary" title="Ask the agent (no files change)">Ask</button>
+        <button id="send-suggest" title="Ask the agent to propose an edit for your review">Suggest edit</button>
+        <button id="send-comment" title="Save a note here without asking an agent">Comment</button>
+      </div>
+      <div class="muted small">Empty “Ask” requests a general explanation. “Log this” or “wrap up” summarizes the session. Agents run read-only; edits apply only if you accept them.</div>
+    </div>
+  </aside>
+</div>
+<div id="selection-pop" hidden><button id="pop-ask">Ask about selection</button></div>
+<div id="modal" hidden><div class="modal-box"><div class="modal-head"><span id="modal-title"></span><button id="modal-close">&times;</button></div><div id="modal-body"></div></div></div>
+<div id="toast" hidden></div>
+<div id="notices" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

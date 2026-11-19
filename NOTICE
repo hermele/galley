@@ -1,0 +1,24 @@
+galley by Michael Hermele
+Copyright (C) 2026 The Regents of the University of Colorado
+
+galley is free software: you can redistribute it and/or modify it under the terms of the GNU
+Affero General Public License as published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version. galley is distributed in the hope that it
+will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License (the file
+LICENSE) for more details.
+
+Additional term under section 7(b) of the GNU Affero General Public License
+---------------------------------------------------------------------------
+
+Modified versions of galley, and works based on galley, must preserve the author attribution
+"Based on galley by Michael Hermele" in their README or equivalent documentation, and in their
+Appropriate Legal Notices (for galley, its "About galley" text). Unmodified copies of galley
+keep its own attribution, "galley by Michael Hermele".
+
+Third-party software included with galley
+-----------------------------------------
+
+vendor/mathjax/: MathJax 3.2.2, Copyright The MathJax Consortium, licensed under the Apache
+License, Version 2.0 (vendor/mathjax/LICENSE). See vendor/mathjax/README.md for its source
+and checksums.

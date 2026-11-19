@@ -1,0 +1,7 @@
+#!/bin/bash
+# galley: read a LaTeX document in your browser and work on it with AI agents.
+# Usage: galley [main.tex] [--port N] [--no-browser]
+# Link this script into a folder on your PATH, e.g.
+#   ln -s "/path/to/galley/galley" ~/.local/bin/galley
+here="$(dirname "$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$0")")"
+exec python3 "$here/galley_server.py" "$@"

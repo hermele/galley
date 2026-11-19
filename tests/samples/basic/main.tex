@@ -1,0 +1,48 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\newtheorem{theorem}{Theorem}
+\newcommand{\gal}{Galley$_2$}
+\newcommand{\R}{\mathbb{R}}
+\title{A Sample Document for galley's Tests}
+\author{A. Tester}
+\date{2026}
+\begin{document}
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+This is a sample about \gal{} and the real line $\R$.
+% a comment-only line inside a paragraph
+It continues here, with an \href{https://example.org}{allowed link} and a
+\href{javascript:alert(1)}{forbidden link}.
+
+\input{sections/results}
+
+\section{Tables and figures}
+\begin{table}[h]
+\centering
+\begin{tabular}{l|cr}
+\toprule
+Name & Value & Count \\
+\midrule
+\multicolumn{2}{c}{joined} & 3 \\
+alpha & $x^2$ & 4 \\
+\bottomrule
+\end{tabular}
+\caption{A small table.}
+\label{tab:small}
+\end{table}
+
+\begin{figure}[h]
+\caption{A figure without a picture.}
+\label{fig:empty}
+\end{figure}
+
+See Table~\ref{tab:small}, Figure~\ref{fig:empty} and Theorem~\ref{thm:main}.
+Accents: \'etude, na\"ive, \AA ngstr\"om.
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
