@@ -62,6 +62,8 @@ button:disabled { opacity: .5; cursor: default; }
 #doc .page { max-width: 44em; margin: 0 auto; font-family: var(--serif); font-size: 17px; line-height: 1.55; }
 .doc-title { font-size: 26px; text-align: center; margin: 12px 0 4px; font-weight: 600; }
 .doc-date { text-align: center; color: var(--muted); margin-bottom: 24px; }
+.doc-authors { text-align: center; margin: 6px 0 2px; }
+.fbox { border: 1px solid currentColor; padding: 0 3px; }
 
 .blk { position: relative; border-radius: 6px; margin: 0 -10px; padding: 1px 10px; }
 .blk.para > .content > :first-child { margin-top: 0; }

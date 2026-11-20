@@ -49,8 +49,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import latex_doc  # noqa: E402
 import diagrams  # noqa: E402
+import figures  # noqa: E402
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SOURCE_URL = "https://github.com/hermele/galley"
 MAX_BODY = 20 * 1024 * 1024  # largest request body accepted (bytes)
 FOLDER = "galley"  # per-document folder, next to the main .tex file
@@ -1154,6 +1155,7 @@ class App:
         self.token = secrets.token_urlsafe(24)  # key for this run; see make_handler
         self.port = 0
         self.diagrams = diagrams.DiagramCompiler(os.path.join(doc.folder, "build", "diagrams"), doc.dir)
+        self.figures = figures.FigureConverter(os.path.join(doc.folder, "build", "figures"))
 
     def find_mathjax(self) -> str | None:
         """MathJax 3 (es5): the copy in vendor/mathjax, or another one named by GALLEY_MATHJAX."""
@@ -1645,6 +1647,17 @@ def make_handler(app: App):
                                 path += ext
                                 break
                     return self.send_file(path)
+                if p == "/figure":
+                    # A figure as an image: images as they are, the first page of a PDF as PNG.
+                    path = app.doc.abs_in_doc(q["path"][0])
+                    if not os.path.splitext(path)[1]:
+                        path = next((path + e for e in (".png", ".pdf", ".jpg", ".jpeg", ".svg") if os.path.isfile(path + e)), path)
+                    ext = os.path.splitext(path)[1].lower()
+                    if ext == ".pdf" and os.path.isfile(path):
+                        return self.send_file(app.figures.png_for(path))
+                    if ext in (".png", ".jpg", ".jpeg", ".gif", ".svg"):
+                        return self.send_file(path)
+                    return self.send_error(HTTPStatus.NOT_FOUND)
                 if p == "/api/doc":
                     return self.send_json(app.doc_json())
                 if p == "/api/version":

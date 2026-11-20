@@ -11,6 +11,8 @@ viewer can be turned into a precise reference for an agent.
 
 from __future__ import annotations
 
+import datetime as dt
+
 import hashlib
 import html
 import os
@@ -26,12 +28,16 @@ NUMBERED_MATH_ENVS = {"equation", "align", "gather", "multline", "flalign"}
 DIAGRAM_RENDERER = "dvisvgm-driver-1"  # part of each diagram's cache key; change it to recompile all
 SECTION_LEVELS = {"section": 1, "subsection": 2, "subsubsection": 3}
 LIST_ENVS = {"enumerate": "ol", "itemize": "ul", "description": "ul"}
+EXTARROWS = {
+    "xlongrightarrow": "xrightarrow", "xlongleftarrow": "xleftarrow", "xLongrightarrow": "xRightarrow",
+    "xLongleftarrow": "xLeftarrow", "xlongleftrightarrow": "xleftrightarrow", "xLongleftrightarrow": "xLeftrightarrow",
+}
 IGNORED_COMMANDS = {
     "noindent", "par", "small", "footnotesize", "normalsize", "large",
     "begingroup", "endgroup", "raggedright", "centering", "medskip",
     "smallskip", "bigskip", "newline", "maketitle", "tableofcontents",
     "protect", "relax", "nobreak", "allowbreak", "clearpage", "newpage",
-    "phantomsection",
+    "phantomsection", "selectfont", "leavevmode", "qedhere",
 }
 SIMPLE_SYMBOLS = {
     "ldots": "\u2026", "dots": "\u2026", "S": "\u00a7", "%": "%", "&": "&amp;",
@@ -271,6 +277,7 @@ class Preamble:
     theorems: dict = field(default_factory=dict)
     title: str = ""
     date: str = ""
+    authors: list = field(default_factory=list)  # \author{...} arguments, in order
     text_macros: dict = field(default_factory=dict)
     eq_within: str = ""  # from \numberwithin{equation}{section}
     float_within: dict = field(default_factory=dict)  # \numberwithin{figure}{section}, same for table
@@ -370,6 +377,10 @@ def parse_preamble(lines: list[Line]) -> Preamble:
         elif name == "date":
             arg, j = read_arg(text, j)
             pre.date = arg
+        elif name == "author":
+            _, j = read_optional(text, j) if text[j:j + 1] == "[" else (None, j)
+            arg, j = read_arg(text, j)
+            pre.authors.append(arg)
         i = j
     return pre
 
@@ -525,6 +536,7 @@ class Renderer:
         self.anchored: set = set()  # labels whose anchor is already placed (at the top of a float)
         self.label_kind: dict[str, str] = {}
         self.authors: list = []
+        self.external_labels: set = set()  # labels read from \externaldocument .aux files (xr)
         self.warnings: list[str] = []
         self.current_block = None  # id of block being rendered
         self.labels_in_block: list[str] = []
@@ -534,7 +546,8 @@ class Renderer:
         self._expanding: list[str] = []  # text macros being expanded (recursion guard)
 
     def add_diagram(self, src: str) -> str:
-        """Register a display containing a tikzcd diagram for compiling; returns its hash."""
+        """Register a display with a diagram or picture (tikzcd, xymatrix, tikzpicture) for compiling;
+        returns its hash."""
         def ref(m):
             n = self.aux_labels.get(m.group(2), "??")
             return "(%s)" % n if m.group(1) == "eqref" else n
@@ -548,7 +561,7 @@ class Renderer:
 
     def diagram_html(self, h: str) -> str:
         return ('<div class="diagram" data-diagram="%s" title="Click to see the LaTeX source">'
-                '<span class="diagram-wait">tikzcd diagram: compiling\u2026</span></div>' % h)
+                '<span class="diagram-wait">diagram: compiling\u2026</span></div>' % h)
 
     def css_color(self, name: str) -> str:
         name = name.strip()
@@ -587,7 +600,7 @@ class Renderer:
                 rep = "\\text{%s}" % n
             elif kind == "matheq":
                 rep = "\\text{(%s)}" % n
-            elif label not in self.own_labels and label in self.aux_labels and ":" in label:
+            elif label not in self.own_labels and label in self.external_labels:
                 # A label from another document (e.g. via the xr package): show its number, no link.
                 text = "(%s)" % n if kind == "eq" else n
                 rep = '<span class="extref" title="Reference to another document (%s)">%s</span>' % (
@@ -668,9 +681,8 @@ class Renderer:
         """Render a display-math environment; returns HTML."""
         # tikzcd displays are compiled to SVG by galley (see diagrams.py); other TikZ pictures
         # cannot be drawn by MathJax: keep the equation (and its number), show a placeholder.
-        has_cd = "\\begin{tikzcd}" in body
-        body = re.sub(r"\\begin\{(tikzpicture|xymatrix)\}.*?\\end\{\1\}",
-                      r"\\boxed{\\text{diagram (\1): see the PDF}}", body, flags=re.S)
+        # Diagrams and pictures in a display are compiled by LaTeX (diagrams.py).
+        has_cd = any(x in body for x in ("\\begin{tikzcd}", "\\xymatrix", "\\begin{tikzpicture}"))
         anchors = []
         numbered = env in NUMBERED_MATH_ENVS
         base = (env or "").rstrip("*")
@@ -833,7 +845,12 @@ class Renderer:
                 end = find_env_end(s, k, env)
                 h = self.add_diagram("\\begin{tikzcd}%s\\end{tikzcd}" % s[k:end])
                 return '<div class="diagram-display">%s</div>' % self.diagram_html(h), end + len("\\end{tikzcd}")
-            if env in ("tikzpicture", "pgfpicture", "picture", "xy"):
+            if env == "tikzpicture":
+                # Compiled with the document's preamble like tikzcd diagrams (diagrams.py).
+                end = find_env_end(s, k, env)
+                h = self.add_diagram("\\begin{tikzpicture}%s\\end{tikzpicture}" % s[k:end])
+                return '<div class="diagram-display">%s</div>' % self.diagram_html(h), end + len("\\end{tikzpicture}")
+            if env in ("pgfpicture", "picture", "xy"):
                 end = find_env_end(s, k, env)
                 return '<div class="figure-placeholder">[%s figure: see the PDF]</div>' % html.escape(env), end + len("\\end{%s}" % env)
             if env in TABLE_ENVS:
@@ -964,9 +981,11 @@ class Renderer:
             _, k = read_optional(s, j)
             arg, k = read_arg(s, k)
             path = arg.strip()
-            if re.search(r"\.(png|jpe?g|gif|svg)$", path, re.I) or not os.path.splitext(path)[1]:
-                return '<img class="figure-img" src="/asset?path=%s" alt="%s">' % (
-                    html.escape(path, quote=True), html.escape(path, quote=True)), k
+            if re.search(r"\.(png|jpe?g|gif|svg|pdf)$", path, re.I) or not os.path.splitext(path)[1]:
+                # /figure serves images as they are and PDFs converted to PNG (figures.py); if that
+                # fails, the page shows a link to the file instead.
+                return '<img class="figure-img" src="/figure?path=%s" alt="%s" data-path="%s">' % (
+                    html.escape(path, quote=True), html.escape(path, quote=True), html.escape(path, quote=True)), k
             return '<a class="figure-file" href="/asset?path=%s" target="_blank">[figure: %s]</a>' % (
                 html.escape(path, quote=True), html.escape(path)), k
         if base in ("caption", "captionof"):
@@ -1028,6 +1047,21 @@ class Renderer:
             return '<span class="footnote">(%s)</span>' % self.render(arg), k
         if base in IGNORED_COMMANDS:
             return "", j
+        if base in ("nopagebreak", "pagebreak", "linebreak", "nolinebreak"):
+            _, k = read_optional(s, j) if s[j:j + 1] == "[" else (None, j)
+            return (" " if base == "linebreak" else ""), k
+        if base == "linespread":
+            _, k = read_arg(s, j)
+            return "", k
+        if base == "today":
+            # LaTeX prints the date of the run; so does galley.
+            d = dt.date.today()
+            return "%s %d, %d" % (d.strftime("%B"), d.day, d.year), j
+        if base == "fbox":
+            arg, k = read_arg(s, j)
+            return '<span class="fbox">%s</span>' % self.render(arg), k
+        if base == "acknowledgments":  # REVTeX: \acknowledgments starts the acknowledgments
+            return '<strong>Acknowledgments.</strong> ', j
         if base in ("hspace", "vspace", "setlength", "addtolength"):
             _, k = read_arg(s, j)
             if base in ("setlength", "addtolength"):
@@ -1474,6 +1508,37 @@ SECTION_RE = re.compile(r"^\s*\\(section|subsection|subsubsection)(\*?)\s*(\[|\{
 BEGIN_RE = re.compile(r"^\s*\\begin\{([^}]+)\}")
 
 
+BLOCK_ENV_RE = re.compile(r"\\(begin|end)\{([^}]+)\}")
+
+
+def split_block_lines(lines: list, envs: set) -> list:
+    r"""Give block environments (theorem-like, proof, abstract) lines of their own: split a line
+    before a \begin{..} that follows other text, and after an \end{..} that other text follows,
+    e.g. "\end{proposition}\begin{proof}" or "...a braiding. \begin{example}". The pieces keep
+    the line's file and number, so passages still point to the right source line."""
+    out = []
+    for line in lines:
+        t = line.text
+        cuts = set()
+        for m in BLOCK_ENV_RE.finditer(t):
+            if m.group(2).strip() not in envs:
+                continue
+            if m.group(1) == "begin" and t[: m.start()].strip():
+                cuts.add(m.start())
+            elif m.group(1) == "end" and t[m.end():].strip():
+                cuts.add(m.end())
+        if not cuts:
+            out.append(line)
+            continue
+        prev = 0
+        for c in sorted(cuts) + [len(t)]:
+            piece = t[prev:c]
+            if piece.strip():
+                out.append(Line(piece, line.file, line.lineno, line.color))
+            prev = c
+    return out
+
+
 def src_hash(lines: list[Line]) -> str:
     text = "\n".join(l.text.strip() for l in lines if l.text.strip())
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
@@ -1510,6 +1575,7 @@ class Builder:
     # --------------------------------------------------------------------
 
     def build(self, body: list[Line]):
+        body = split_block_lines(body, set(self.r.pre.theorems) | {"proof", "abstract", "thebibliography"})
         i = 0
         n = len(body)
         while i < n:
@@ -1730,6 +1796,9 @@ class Builder:
             collected.append(line)
             depth += len(re.findall(r"\\begin\{", line.text)) - len(re.findall(r"\\end\{", line.text))
             depth += len(re.findall(r"(?<!\\)\\\[", line.text)) - len(re.findall(r"(?<!\\)\\\]", line.text))
+            # An \end without its \begin in this paragraph (malformed or unusual source) must not
+            # keep the paragraph open: it would swallow the rest of the document.
+            depth = max(depth, 0)
             k += 1
         bid = self.new_id()
         prev_block = self.r.current_block
@@ -1742,7 +1811,8 @@ class Builder:
         block = {"id": bid, "kind": "para", "anchor": self.anchor(collected),
                  "labels": list(self.r.labels_in_block)}
         self.finish_html(block, rendered)
-        target.append(block)
+        if rendered.strip() or block["labels"]:
+            target.append(block)  # a paragraph that shows nothing (e.g. only \linespread) is left out
         self.r.current_block = prev_block
         self.r.labels_in_block = prev_labels
         return k
@@ -1841,10 +1911,13 @@ def parse_document(doc_dir: str, main_file: str, aux_path: str | None = None,
     toc: dict = {}
     labels, cites = read_aux(aux_path or "", toc=toc)
     # \externaldocument[prefix]{name} (xr package): labels of another document.
-    for m in re.finditer(r"\\externaldocument\[([^\]]*)\]\{([^}]*)\}", "\n".join(l.text for l in lines[:begin])):
-        l2, _ = read_aux(os.path.join(doc_dir, m.group(2) + ".aux"), m.group(1))
-        labels.update(l2)
+    external: set = set()
+    for m in re.finditer(r"\\externaldocument(?:\[([^\]]*)\])?\{([^}]*)\}", "\n".join(l.text for l in lines[:begin])):
+        l2, _ = read_aux(os.path.join(doc_dir, m.group(2) + ".aux"), m.group(1) or "")
+        external.update(k for k in l2 if k not in labels)
+        labels.update({k: v for k, v in l2.items() if k not in labels})
     r = Renderer(pre, labels, cites, toc)
+    r.external_labels = external
     preamble_tex = raw_preamble(os.path.join(doc_dir, main_file))
     # The hash covers the expanded preamble, so editing an \input macro file recompiles diagrams.
     r.diagram_key = preamble_tex + "\n".join(l.text for l in lines[:begin])
@@ -1869,10 +1942,26 @@ def parse_document(doc_dir: str, main_file: str, aux_path: str | None = None,
     # Agent-written text inside mathematics: a class the viewer can color or not.
     macros["AGTADD"] = ["\\class{agent}{#1}", 1]
     macros.setdefault("ensuremath", ["#1", 1])  # macros written with \ensuremath, used in math
+    macros.setdefault("mathbbm", ["\\mathbb{#1}", 1])  # bbm package; MathJax has only \mathbb
+    # extarrows package: MathJax has the same arrows under amsmath/mathtools names.
+    for name, target in EXTARROWS.items():
+        macros.setdefault(name, ["\\%s[#1]{#2}" % target, 2, ""])
+    # Line-breaking hints and \qedhere mean nothing to MathJax; drop them.
+    for name in ("allowbreak", "nobreak", "qedhere"):
+        macros.setdefault(name, "")
+    macros.setdefault("linebreak", ["", 1, ""])
     title = plain_title(pre.title, pre.text_macros) or os.path.splitext(os.path.basename(main_file))[0]
+    names = []
+    for a in pre.authors + r.authors:
+        a = re.sub(r"\\thanks\s*\{(?:[^{}]|\{[^{}]*\})*\}", "", a)
+        for part in re.split(r"\\and\b", a):
+            name = re.split(r"\\\\", part)[0].strip()  # article style: the name, then lines of address
+            if name:
+                names.append(r.render(name).strip())
     return {
         "title": title,
         "title_html": r.render(pre.title) if pre.title else html.escape(title),
+        "authors_html": ", ".join(n for n in names if n),
         "date": plain_title(pre.date),
         "date_html": r.render(pre.date),
         "main_file": main_file,

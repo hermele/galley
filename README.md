@@ -1,6 +1,6 @@
 # galley
 
-galley by Michael Hermele. Version 1.0.0.
+galley by Michael Hermele. Version 1.0.1.
 
 galley lets you read a LaTeX document in your web browser and work on it with an AI agent (Codex or Claude Code) at your side. You can:
 
@@ -23,7 +23,8 @@ galley was written by Claude, Anthropic's AI model (working in Claude Cowork), u
 - At least one agent command-line tool, installed and signed in:
   - **Codex**: the `codex` command ([OpenAI Codex CLI](https://github.com/openai/codex)).
   - **Claude Code**: the `claude` command ([Claude Code](https://code.claude.com/docs/en/overview)); run `claude` once to sign in.
-- **LaTeX** (MacTeX or TeX Live): `latexmk` for galley's **Build PDF** (galley can also use a PDF you build yourself), and `latex` and `dvisvgm` to draw `tikzcd` diagrams. Without them galley still works and shows a placeholder for each diagram.
+- **LaTeX** (MacTeX or TeX Live): `latexmk` for galley's **Build PDF** (galley can also use a PDF you build yourself), and `latex` and `dvisvgm` to draw `tikzcd` and `xymatrix` diagrams and TikZ pictures. Without them galley still works and shows a placeholder for each diagram.
+- For figures included as PDF files: poppler's `pdftocairo` (on Linux usually present; on macOS optionally via Homebrew, `brew install poppler`), or on macOS the built-in Quick Look. Without either, galley shows a link that opens the figure.
 - A web browser. galley includes MathJax, so it needs no internet connection of its own (the agents do).
 - Git is optional: galley works on a document in any folder. In a Git repository it also shows uncommitted changes and helps collaborators share notes.
 
@@ -84,7 +85,7 @@ If you edit the `.tex` files in another editor while galley is open, galley noti
 
 ### Commutative diagrams
 
-galley draws `tikzcd` diagrams by compiling each display that contains one with your document's own preamble (`latex`, then `dvisvgm`) in the background, the first time it is shown. The pictures are cached in `galley/build/diagrams/`, so a diagram is compiled again only when it or the preamble changes. Equation numbers are kept, and clicking a diagram opens its LaTeX source in the sidebar. If a diagram does not compile, galley shows a placeholder with the LaTeX error under "Why"; it tries again the next time galley starts.
+galley draws `tikzcd` and `xymatrix` diagrams and TikZ pictures (`tikzpicture`) by compiling each display or picture that contains one with your document's own preamble (`latex`, then `dvisvgm`) in the background, the first time it is shown. The pictures are cached in `galley/build/diagrams/`, so a diagram is compiled again only when it or the preamble changes. Equation numbers are kept, and clicking a diagram opens its LaTeX source in the sidebar. If a diagram does not compile, galley shows a placeholder with the LaTeX error under "Why"; it tries again the next time galley starts.
 
 ### Violet marking
 
@@ -133,7 +134,7 @@ galley runs only on your computer and is built to be safe to point at a document
 - **Agents run read-only.** Codex runs in its read-only sandbox; Claude Code may only read, search and list files. Agents start in the document's folder (or a folder inside it or its repository, if `galley/settings.json` says so).
 - **Files change only when you say so, and only the document's sources.** Edits, by hand or proposed by an agent and accepted, can change only the `.tex` files the document includes and the `.bib` files it names: never `galley/` files, `latexmkrc`, scripts or anything else, and never through a symlink pointing out of the document folder. An agent's proposal that touches any other file is refused as a whole and shown in red, so you can see what was attempted.
 - **galley asks before building with a command it has not seen.** `galley/settings.json` travels with a shared document and sets the command **Build PDF** runs, and `latexmk` runs a `latexmkrc` in the document's folder as Perl code. Before running a command other than galley's default, or with such a file present, galley shows them and asks; your approval is remembered in your own settings (not in the document) until the command or the files change.
-- **Diagrams are compiled safely.** galley compiles `tikzcd` diagrams with the document's preamble automatically, so it runs `latex` without shell escape and with restricted file access: no commands, no reading or writing files outside its work folder and TeX's search path.
+- **Diagrams are compiled safely.** galley compiles diagrams and TikZ pictures with the document's preamble automatically, so it runs `latex` without shell escape and with restricted file access: no commands, no reading or writing files outside its work folder and TeX's search path.
 - **Git is used read-only and cannot run programs.** galley runs only read-only `git` commands, with the repository's `core.fsmonitor` and hooks switched off. If the repository's own settings define a filter program, galley does not run `git status` there.
 
 **What remains up to you:** a document someone shares with you can contain instructions aimed at the agent, in its text, in `galley/instructions.md` or in its notes ("prompt injection"). The agent cannot change files or reach the network on its own, but its answers are shown to you: treat unexpected links, commands or advice in an answer with care, and read proposed diffs before accepting them.
@@ -146,7 +147,7 @@ Each galley session writes a record as it goes, so nothing depends on rememberin
 
 ## Limitations
 
-- The rendering is approximate. `tikzcd` diagrams are drawn by LaTeX (see above), but other TikZ pictures appear as placeholders, unusual commands show in orange, and the PDF remains authoritative. Tables (`tabular`, `tabularx`, `longtable`, ...) are drawn as plain HTML tables: alignment, rules and `\multicolumn` are kept, but not colours, widths of `p{}` columns or `\multirow` spans. References and numbering come from the last LaTeX build where available, so rebuild after adding labels.
+- The rendering is approximate. `tikzcd` and `xymatrix` diagrams and TikZ pictures are drawn by LaTeX (see above), and figures in PDF files are converted to images (first page only); pictures that depend on their position on the page (`remember picture`, `overlay`) may not compile, unusual commands show in orange, and the PDF remains authoritative. Tables (`tabular`, `tabularx`, `longtable`, ...) are drawn as plain HTML tables: alignment, rules and `\multicolumn` are kept, but not colours, widths of `p{}` columns or `\multirow` spans. References and numbering come from the last LaTeX build where available, so rebuild after adding labels.
 - Each question starts a fresh agent call. Follow-ups in the same sidebar include the earlier questions and answers, but the agent does not keep a running conversation.
 - galley is meant for one person per computer, on their own copy of the document. Several people can use it on a shared document through Git.
 
@@ -154,7 +155,7 @@ For agents: see `AGENTS.md` for how to install galley for someone, set it up for
 
 ## Development
 
-galley is a few Python files (standard library only) and a static page: `galley_server.py` (server, agents, records), `latex_doc.py` (the LaTeX renderer), `diagrams.py` (tikzcd diagrams), `static/` (the page) and `vendor/mathjax/` (MathJax 3.2.2, see its README). The tests use sample documents in `tests/samples/` and run with
+galley is a few Python files (standard library only) and a static page: `galley_server.py` (server, agents, records), `latex_doc.py` (the LaTeX renderer), `diagrams.py` (diagrams and TikZ pictures), `figures.py` (PDF figures), `static/` (the page) and `vendor/mathjax/` (MathJax 3.2.2, see its README). The tests use sample documents in `tests/samples/` and run with
 
 ```sh
 python3 -m unittest discover -s tests

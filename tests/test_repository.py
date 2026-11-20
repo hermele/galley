@@ -7,7 +7,7 @@ import unittest
 
 from helpers import ROOT, galley_server
 
-SOURCES = ["galley_server.py", "latex_doc.py", "diagrams.py", "static/app.js", "static/app.css", "make_bundle.sh"]
+SOURCES = ["galley_server.py", "latex_doc.py", "diagrams.py", "figures.py", "static/app.js", "static/app.css", "make_bundle.sh"]
 
 
 def read(rel):

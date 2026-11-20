@@ -48,6 +48,20 @@ class Diagrams(GalleyTestCase):
         self.assertIn(b"<svg", raw)
         self.assertIn("sandbox", headers["Content-Security-Policy"])
 
+    def test_xymatrix_diagram(self):
+        if not shutil.which("kpsewhich") or not subprocess.run(["kpsewhich", "xy.sty"], capture_output=True,
+                                                                  text=True).stdout.strip():
+            self.skipTest("xy package not installed")
+        pre = "\\documentclass{article}\n\\usepackage[all]{xy}\n"
+        st = self.compile(pre, "\\[\n\\xymatrix{ A \\ar[r]^f & B }\n\\]", h="00aa11bb22cc33dd")
+        self.assertEqual(st["state"], "done", st)
+
+    def test_tikzpicture(self):
+        pre = "\\documentclass{article}\n\\usepackage{tikz}\n"
+        src = "\\begin{tikzpicture}\n\\draw[blue] (0,0) rectangle (1,1);\n\\node at (0.5,0.5) {$X$};\n\\end{tikzpicture}"
+        st = self.compile(pre, src, h="11aa22bb33cc44dd")
+        self.assertEqual(st["state"], "done", st)
+
     def test_input_from_document_folder_still_works(self):
         with open(os.path.join(self.docdir, "mymacros.tex"), "w") as fh:
             fh.write("\\newcommand{\\obj}{X}\n")

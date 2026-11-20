@@ -307,7 +307,8 @@ async function loadDoc(keep) {
   setupAgents(doc);
   updateMenuState();
   initMathJax(doc.macros);
-  const page = `<div class="page">${setupBanner(doc)}<div class="doc-title">${doc.title_html}</div><div class="doc-date">${doc.date_html || esc(doc.date)}</div>${renderBlocks(doc.blocks)}</div>`;
+  watchFigures();
+  const page = `<div class="page">${setupBanner(doc)}<div class="doc-title">${doc.title_html}</div>${doc.authors_html ? `<div class="doc-authors">${doc.authors_html}</div>` : ""}<div class="doc-date">${doc.date_html || esc(doc.date)}</div>${renderBlocks(doc.blocks)}</div>`;
   const main = $("#doc");
   main.innerHTML = page;
   main.classList.toggle("filtered", S.filtered);
@@ -500,7 +501,7 @@ function blockTitle(id) {
 // a reference point (a block and how far through it the top of the window is) up to date while
 // you scroll, and after a width change scrolls so that point is back where it was.
 
-const READ_SEL = ".blk, .sec-head, .env-head, .doc-title, .doc-date, .setup-banner";
+const READ_SEL = ".blk, .sec-head, .env-head, .doc-title, .doc-authors, .doc-date, .setup-banner";
 
 function readLine() { return ($("#topbar")?.offsetHeight || 49) + 8; }
 
@@ -929,6 +930,26 @@ async function setArchived(body, archived) {
   if (r.changed) toast(`${archived ? "Archived" : "Unarchived"} ${r.changed} item${r.changed === 1 ? "" : "s"}.`);
 }
 
+// ---------------------------------------------------------------- figures
+
+// A figure galley cannot show as an image (e.g. a PDF with no converter on this computer)
+// becomes a link that opens the file in the browser.
+function watchFigures() {
+  S.figureWatch = S.figureWatch || ((ev) => {
+    const img = ev.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains("figure-img")) return;
+    const a = document.createElement("a");
+    a.className = "figure-file";
+    a.href = "/asset?path=" + encodeURIComponent(img.dataset.path || "");
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = `[figure: ${img.dataset.path || ""}]`;
+    img.replaceWith(a);
+  });
+  document.removeEventListener("error", S.figureWatch, true);
+  document.addEventListener("error", S.figureWatch, true);
+}
+
 // ---------------------------------------------------------------- tikzcd diagrams
 
 // galley compiles each display with a tikzcd diagram to SVG in the background (diagrams.py).
@@ -948,12 +969,12 @@ async function loadDiagrams() {
     if (!s || s.state === "pending") { pending = true; continue; }
     el.classList.add("ready");
     if (s.state === "done") {
-      el.innerHTML = `<img src="/api/diagram/${el.dataset.diagram}.svg" alt="tikzcd diagram">`;
+      el.innerHTML = `<img src="/api/diagram/${el.dataset.diagram}.svg" alt="diagram">`;
       const img = el.firstElementChild;
       img.onload = () => { img.style.width = Math.round(img.naturalWidth * scale) + "px"; };
     } else {
       el.classList.add("failed");
-      el.innerHTML = `<span class="figure-placeholder">[tikzcd diagram: could not be compiled; see the PDF]</span>
+      el.innerHTML = `<span class="figure-placeholder">[diagram: could not be compiled; see the PDF]</span>
         <details class="diagram-error"><summary>Why</summary><pre>${esc(s.error || "")}</pre></details>`;
     }
   }
